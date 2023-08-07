@@ -330,7 +330,7 @@ class HyperparameterOptimization:
 
         return best_trial_under_n(best_trials, training_number)
 
-    def save_best_trials_to_file(self, filename: str = "best_trials") -> None:
+    def save_best_trials_to_file(self, filename: str = "best_trials_modes") -> None:
         """Save the best trials obtained so far in the optimization to the file
         "filename".pkl.
 

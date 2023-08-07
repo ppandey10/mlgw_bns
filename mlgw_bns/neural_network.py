@@ -10,6 +10,7 @@ import numpy as np
 import pkg_resources
 from sklearn.neural_network import MLPRegressor  # type: ignore
 from sklearn.preprocessing import StandardScaler  # type: ignore
+from sklearn.metrics import mean_absolute_error # There's no callbacks object like there is in `Keras`
 
 if TYPE_CHECKING:
     import optuna
@@ -159,24 +160,25 @@ class Hyperparameters:
     @classmethod
     def default(cls, training_waveform_number: Optional[int] = None):
 
-        try:
-            if training_waveform_number is not None:
-                best_trials = retrieve_best_trials_list()
-                return best_trial_under_n(best_trials, training_waveform_number)
-        except (FileNotFoundError, IndexError):
-            pass
+        # try:
+        #     if training_waveform_number is not None:
+        #         best_trials = retrieve_best_trials_list()
+        #         return best_trial_under_n(best_trials, training_waveform_number)
+        # except (FileNotFoundError, IndexError):
+        #     pass
+        assert training_waveform_number is not None
 
         return cls(
-            hidden_layer_sizes=(50, 50),
+            hidden_layer_sizes=(106, 23), # (150, 200),
             activation="relu",
-            alpha=1e-4,
-            batch_size=200,
-            learning_rate_init=1e-3,
-            tol=1e-9,
-            n_iter_no_change=50,
-            validation_fraction=0.1,
-            pc_exponent=0.2,
-            n_train=200,
+            alpha=0.017351174254327164, # 1e-4
+            batch_size=196, # previously 50
+            learning_rate_init=0.00027700728622553824,
+            tol=7.230581728895463e-12,
+            n_iter_no_change=51,
+            validation_fraction=0.07671981357346613,
+            pc_exponent=0.006594127410992486,
+            n_train=152,
         )
 
 
@@ -249,7 +251,10 @@ class SklearnNetwork(NeuralNetwork):
         param_scaler: Optional[StandardScaler] = None,
     ):
         super().__init__(hyper=hyper)
-        self.nn = MLPRegressor(**hyper.nn_params) if nn is None else nn
+        if nn is None:
+            self.nn = MLPRegressor(**hyper.nn_params)
+        else:
+            self.nn = nn
         if param_scaler is not None:
             self.param_scaler: StandardScaler = param_scaler
 
@@ -267,6 +272,12 @@ class SklearnNetwork(NeuralNetwork):
     def predict(self, x_data: np.ndarray) -> np.ndarray:
         scaled_x = self.param_scaler.transform(x_data)
         return self.nn.predict(scaled_x)
+
+    def get_loss_over_epochs(self):
+        loss_over_epochs = []
+        for epoch in range(self.nn.n_iter_):
+            loss_over_epochs.append(self.nn.loss_curve_[epoch])
+        return loss_over_epochs
 
     def save(self, filename: str):
         joblib.dump((self.hyper, self.nn, self.param_scaler), filename)
@@ -348,6 +359,7 @@ class TorchNetwork(NeuralNetwork):
             prediction = self.nn(b_x)
 
             loss = loss_func(prediction, b_y)
+            loss_array = loss_progression(loss)
 
             optimizer.zero_grad()  # clear gradients for next train
             loss.backward()  # backpropagation, compute gradients
@@ -366,6 +378,9 @@ class TorchNetwork(NeuralNetwork):
 
     def save(self, filename: str):
         joblib.dump((self.hyper, self.nn), filename)
+
+    def loss_progression(self, float_loss: float) -> np.ndarray:
+        np.append(float_loss)
 
     @classmethod
     def from_file(cls, filename: Union[IO[bytes], str]):

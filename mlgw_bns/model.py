@@ -32,6 +32,15 @@ from .dataset_generation import (
     WaveformGenerator,
     WaveformParameters,
 )
+from .higher_order_modes import (
+    BarePostNewtonianModeGenerator,
+    Mode,
+    ModeGenerator,
+    ModeGeneratorFactory,
+    spherical_harmonic_spin_2,
+    spherical_harmonic_spin_2_conjugate, 
+    teob_mode_generator_factory,
+)
 from .downsampling_interpolation import DownsamplingTraining, GreedyDownsamplingTraining
 from .neural_network import Hyperparameters, NeuralNetwork, SklearnNetwork
 from .principal_component_analysis import (
@@ -39,10 +48,15 @@ from .principal_component_analysis import (
     PrincipalComponentTraining,
 )
 from .taylorf2 import SUN_MASS_SECONDS, smoothing_func
+# from .taylorF2_HOM import *
 
 PRETRAINED_MODEL_FOLDER = "data/"
 MODELS_AVAILABLE = ["default", "fast"]
 
+PRETRAINED_MODES_MODEL_FOLDER = "data/HOM/"
+MODES_MODELS_AVAILABLE = ["pp_small_default_l2_m2", "pp_large_default_l2_m2"] 
+
+DEFAULT_DATASET_BASENAME = "data/default"
 
 class FrequencyTooLowError(ValueError):
     """Raised when the frequency given to the predictor is too low."""
@@ -122,23 +136,23 @@ class ParametersWithExtrinsic:
             dataset=dataset,
         )
 
-    @classmethod
-    def gw170817(cls) -> ParametersWithExtrinsic:
-        """Convenience method: an easy-to-access
-        set of parameters, roughly corresponding to the
-        best-fit values for GW170817.
-        """
+    # @classmethod
+    # def gw170817(cls) -> ParametersWithExtrinsic:
+    #     """Convenience method: an easy-to-access
+    #     set of parameters, roughly corresponding to the
+    #     best-fit values for GW170817.
+    #     """
         
-        return cls(
-            mass_ratio=1.,
-            lambda_1=400.,
-            lambda_2=400.,
-            chi_1=0.,
-            chi_2=0.,
-            distance_mpc=40.,
-            inclination=5/6*np.pi,
-            total_mass=2.8,
-        )
+    #     return cls(
+    #         mass_ratio=1.,
+    #         lambda_1=400.,
+    #         lambda_2=400.,
+    #         chi_1=0.,
+    #         chi_2=0.,
+    #         distance_mpc=40.,
+    #         inclination=5/6*np.pi,
+    #         total_mass=2.8,
+    #     )
 
     @property
     def mass_sum_seconds(self) -> float:
@@ -225,17 +239,18 @@ class Model:
     def __init__(
         self,
         filename: Optional[str] = None,
-        initial_frequency_hz: float = 10.0,
+        initial_frequency_hz: float = 10.0, # it was 20 in jacopo's hom implementation
         srate_hz: float = 4096.0,
         pca_components_number: int = 30,
         multibanding: bool = True,
-        parameter_ranges: ParameterRanges = ParameterRanges(),
         extend_with_post_newtonian = True,
         extend_with_zeros_at_high_frequency = False,
         waveform_generator: Optional[WaveformGenerator] = None,
         downsampling_training: Optional[DownsamplingTraining] = None,
         nn_kind: Type[NeuralNetwork] = SklearnNetwork,
+        parameter_ranges: ParameterRanges = ParameterRanges(),
         parameter_generator : Optional[ParameterGenerator] = None,
+        mode: Optional[Mode] = None
     ):
 
         self.filename = filename
@@ -258,8 +273,8 @@ class Model:
         self.multibanding = multibanding
         self.parameter_generator = parameter_generator
         self.extend_with_post_newtonian = extend_with_post_newtonian
-        self.extend_with_zeros_at_high_frequency = extend_with_zeros_at_high_frequency
-        
+        self.extend_with_zeros_at_high_frequency = extend_with_zeros_at_high_frequency 
+        # The last two snippets were not included in the Jacopo implementation
 
         self.dataset = self._make_dataset()
 
@@ -281,6 +296,7 @@ class Model:
         self.downsampling_indices: Optional[DownsamplingIndices] = None
 
         self.nn_kind = nn_kind
+        self.mode = mode
 
     def __str__(self):
 
@@ -314,6 +330,19 @@ class Model:
 
     @classmethod
     def default(cls, model_name: Optional[str]=None, **kwargs):
+        model = cls(DEFAULT_DATASET_BASENAME)
+
+        stream_arrays = pkg_resources.resource_stream(__name__, model.filename_arrays)
+        stream_nn = pkg_resources.resource_stream(__name__, model.filename_nn)
+
+        model.load(streams=(stream_arrays, stream_nn))
+
+        model.filename = filename
+
+        return model
+
+    @classmethod
+    def default_for_testing(cls, model_name: Optional[str]=None, **kwargs):
         
         if model_name is None:
             model_name = MODELS_AVAILABLE[0]
@@ -334,6 +363,30 @@ class Model:
         model.filename = given_filename
 
         return model
+
+    @classmethod
+    def modes_default(cls, model_name: Optional[str]=None, **kwargs):
+        
+        if model_name is None:
+            model_name = MODES_MODELS_AVAILABLE[0]
+
+        if model_name not in MODES_MODELS_AVAILABLE:
+            raise(ValueError(f'Model {model_name} not available!'))
+        
+        given_filename = kwargs.pop('filename', None)
+        
+        model = cls(filename = PRETRAINED_MODES_MODEL_FOLDER + model_name, **kwargs)
+
+        stream_meta = pkg_resources.resource_stream(__name__, model.filename_metadata)
+        stream_arrays = pkg_resources.resource_stream(__name__, model.filename_arrays)
+        stream_nn = pkg_resources.resource_stream(__name__, model.filename_nn)
+
+        model.load(streams=(stream_meta, stream_arrays, stream_nn))
+
+        model.filename = given_filename
+
+        return model
+  
 
     def _make_dataset(self) -> Dataset:
 
@@ -369,7 +422,6 @@ class Model:
             self.dataset.waveform_generator = val
         except AttributeError:
             pass
-
 
     def _handle_missing_filename(self) -> None:
         raise ValueError('Please set the "filename" attribute of this object')
@@ -521,6 +573,7 @@ class Model:
         arr_list: list[SavableData] = [
             self.downsampling_indices,
             self.pca_data,
+            self.parameter_ranges
         ]
 
         if include_training_data:
@@ -616,6 +669,7 @@ class Model:
         """
         return PrincipalComponentAnalysisModel(self.pca_components_number)
 
+
     def train_nn(
         self, hyper: Hyperparameters, indices: Union[list[int], slice] = slice(None)
     ) -> NeuralNetwork:
@@ -645,10 +699,16 @@ class Model:
         )
 
         nn = self.nn_kind(hyper)
+
         nn.fit(
             self.training_parameters.parameter_array[indices],
             training_residuals[indices],
         )
+
+        loss_over_epochs = nn.get_loss_over_epochs()
+
+        # print(f"Loss over epochs: {loss_over_epochs}")
+        
         return nn
 
     def set_hyper_and_train_nn(self, hyper: Optional[Hyperparameters] = None) -> None:
@@ -666,12 +726,14 @@ class Model:
         if hyper is None:
             assert self.training_dataset is not None
             hyper = Hyperparameters.default(len(self.training_dataset))
+            # hyper = Hyperparameters.from_trial(n_train_max = 50)
 
         # increase the number of maximum iterations by a lot:
         # here we do not want to stop the training early.
-        hyper.max_iter *= 100
+        hyper.max_iter *= 10
 
         self.nn = self.train_nn(hyper)
+
 
     def predict_residuals_bulk(
         self, params: ParameterSet, nn: NeuralNetwork
@@ -722,7 +784,7 @@ class Model:
             residuals, params, self.downsampling_indices
         )
 
-    def _predict_amplitude_phase(
+    def predict_amplitude_phase(
         self, frequencies: np.ndarray, params: ParametersWithExtrinsic
     ) -> tuple[np.ndarray, np.ndarray]:
         """Predict the amplitude and phase of a waveform.
@@ -886,7 +948,7 @@ class Model:
         phi = (
             resampled_phi
             + params.reference_phase
-            + (2 * np.pi * params.time_shift) * frequencies
+            + (2 * np.pi * params.time_shift) * frequencies # TODO: changed `+` to `-` 
         )
         
         return amp, phi
@@ -954,7 +1016,7 @@ class Model:
 
         """
 
-        amp, phi = self._predict_amplitude_phase(frequencies, params)
+        amp, phi = self.predict_amplitude_phase(frequencies, params)
 
         cartesian_waveform_real, cartesian_waveform_imag = combine_amp_phase(amp, phi)
 
@@ -1015,6 +1077,75 @@ class Model:
 
         return derivative / (2 * np.pi)
 
+class ModesModel:
+    """Model including higher-order modes.
+    Internally uses a Model for the reconstruction of each required mode.
+    """
+    
+    def __init__(self, modes: list[Mode], generator_factory: ModeGeneratorFactory = teob_mode_generator_factory, **model_kwargs):
+        
+        self.modes = modes
+        
+        self._base_filename = model_kwargs.pop('filename', '')
+                
+        self.models = {} # or I can its the mode_dict
+        for mode in modes:
+
+            self.models[mode] = Model(
+                mode=mode, 
+                filename=self.mode_filename(mode), 
+                waveform_generator=generator_factory(mode),
+                **model_kwargs
+            )
+    
+    def mode_filename(self, mode: Mode) -> str:
+        return f'{self.base_filename}_l{mode[0]}_m{mode[1]}'
+    
+    @property
+    def base_filename(self) -> str:
+        return self._base_filename
+
+    @base_filename.setter
+    def base_filename(self, value: str):
+        self._base_filename = value
+        for mode, model in self.models.items():
+            model.filename = self.mode_filename(mode)
+    
+    def generate(self, *args, **kwargs) -> None:
+        for model in self.models.values():
+            model.generate(*args, **kwargs)
+
+    def set_hyper_and_train_nn(self, *args, **kwargs) -> None:
+        for model in self.models.values():
+            model.set_hyper_and_train_nn(*args, **kwargs)
+
+    def save(self, *args, **kwargs) -> None: 
+        for model in self.models.values():
+            model.save(*args, **kwargs)
+
+    def load(self, *args, **kwargs) -> None:
+        for model in self.models.values():
+            model.load(*args, **kwargs)
+
+
+    def predict(self, frequencies: np.ndarray, params: ParametersWithExtrinsic) -> tuple[np.ndarray, np.ndarray]:
+        """Predict the plus- and cross-polarized frequency-domain waveform corresponding to 
+        the given parameters, accounting for the effects of the included modes.
+        
+        References: https://arxiv.org/pdf/2004.06503.pdf (appendix E) for the modes decomposition.
+        """
+        
+
+        h_plus = np.zeros_like(frequencies, dtype=np.complex64)
+        h_cross = np.zeros_like(frequencies, dtype=np.complex64)
+        
+        for mode, model in self.models.items():
+            amp, phi = model.predict_amplitude_phase(frequencies, params)
+            h_plus += h_plus_from_mode(amp, phi, mode, params.inclination, params.reference_phase)
+            h_cross += h_cross_from_mode(amp, phi, mode, params.inclination, params.reference_phase)
+        
+        return h_plus, h_cross
+
 
 @njit
 def combine_amp_phase(
@@ -1062,7 +1193,7 @@ def combine_residuals_amp(amp: np.ndarray, amp_pn: np.ndarray) -> np.ndarray:
 @njit
 def combine_residuals_phi(phi: np.ndarray, phi_pn: np.ndarray) -> np.ndarray:
     r"""Combine amplitude residuals with their Post-Newtonian counterparts,
-    according to
+    according tos
     :math:`\phi = \phi_{PN} + \Delta \phi`.
 
     This function is separated out just so that it can be decorated with ``@njit``.
@@ -1115,4 +1246,67 @@ def compute_polarizations(
     hc = pre_cross * waveform_imag - 1j * pre_cross * waveform_real
 
     return hp, hc
+ 
 
+def h_plus_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination: float, reference_phase: float) -> np.ndarray:
+    """Contribution to the plus polarization from a single mode 
+    with both values of m: so, (l, m) as well as (l, -m) with m > 0.
+    """
+    
+    sin_phi = np.sin(phi)
+    cos_phi = np.cos(phi)
+    
+    Y_plus_re, Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase)
+    Y_minus_re, Y_minus_im  = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase)
+
+    # Y_plus_re = spherical_harmonic_plus.real
+    # Y_plus_im = spherical_harmonic_plus_m.imag
+    # Y_minus_re = spherical_harmonic_minus_m.real
+    # Y_minus_im = spherical_harmonic_minus_m.imag
+    
+    ml = (-1)**mode.l
+    
+    h_plus_re = amp / 2 * (
+        + cos_phi * (Y_plus_re + ml * Y_minus_re)
+        + sin_phi * (Y_plus_im + ml * Y_minus_im)
+    )
+    
+    h_plus_im = amp / 2 * (
+        + cos_phi * (Y_plus_im + ml * Y_minus_im)
+        - sin_phi * (Y_plus_re + ml * Y_minus_re)
+    )
+    
+    return h_plus_re - 1j * h_plus_im
+
+def h_cross_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination: float, reference_phase: float) -> np.ndarray:
+    """Contribution to the cross polarization from a single mode 
+    with both values of m: so, (l, m) as well as (l, -m) with m > 0.
+    """
+    
+    sin_phi_3hp = np.sin(phi + 3 * np.pi / 2)
+    cos_phi_3hp = np.cos(phi + 3 * np.pi / 2)
+    
+    sin_phi = np.sin(phi)
+    cos_phi = np.cos(phi)
+    
+    Y_plus_re, Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase)
+    Y_minus_re, Y_minus_im = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase)
+
+    # Y_plus_re = spherical_harmonic_plus_m.real
+    # Y_plus_im = spherical_harmonic_plus_m.imag
+    # Y_minus_re = spherical_harmonic_minus_m.real
+    # Y_minus_im = spherical_harmonic_minus_m.imag
+    
+    ml = (-1)**mode.l
+    
+    h_cross_re = - amp / 2 * (
+        + cos_phi * (Y_plus_re - ml * Y_minus_re)
+        + sin_phi * (Y_plus_im - ml * Y_minus_im)
+    )
+    
+    h_cross_im = - amp / 2 * (
+        + cos_phi * (Y_plus_im - ml * Y_minus_im)
+        - sin_phi * (Y_plus_re - ml * Y_minus_re)
+    )
+
+    return h_cross_re - 1j * h_cross_im

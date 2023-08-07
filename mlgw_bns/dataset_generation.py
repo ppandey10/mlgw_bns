@@ -37,7 +37,6 @@ TF2_BASE: float = 3.668693487138444e-19
 AMP_SI_BASE: float = 4.2425873413901263e24
 # Mpc / Msun**2 / Hz
 
-
 class WaveformGenerator(ABC):
     """Generator of theoretical waveforms
     according to some pre-existing model.
@@ -110,7 +109,7 @@ class WaveformGenerator(ABC):
                 passed to :func:`WaveformParameters.taylor_f2`.
 
         Returns
-        -------
+        ----------
         phase : np.ndarray
                 Phase of the Fourier transform of the waveform,
                 specifically the phase of the plus polarization in radians.
@@ -245,6 +244,7 @@ class TEOBResumSGenerator(BarePostNewtonianGenerator):
     TEOBResumS effective-one-body code"""
 
     def __init__(self, eobrun_callable: Callable[[dict], tuple[np.ndarray, ...]]):
+        
         super().__init__()
         self.eobrun_callable = eobrun_callable
 
@@ -293,7 +293,11 @@ class TEOBResumSGenerator(BarePostNewtonianGenerator):
             par_dict["interp_freqs"] = "yes"
             par_dict["freqs"] = frequencies_list
 
+        # par_dict["arg_out"] = "yes"
+        # par_dict["use_mode_lm"] = [1]
+
         f_spa, rhpf, ihpf, _, _ = self.eobrun_callable(par_dict)
+        # f_spa, _, _, _, _, hflm, _, _ = self.eobrun_callable(par_dict)
 
         f_spa = f_spa[to_slice]
         # f_spa = f_spa
@@ -302,6 +306,8 @@ class TEOBResumSGenerator(BarePostNewtonianGenerator):
         # waveform = rhpf - 1j * ihpf
 
         amplitude, phase = phase_unwrapping(waveform)
+        # amplitude = hflm['1'][0][to_slice] # quite weird notation (`str`)
+        # phase = hflm['1'][1][to_slice]
 
         return (f_spa, amplitude, phase)
 
@@ -766,7 +772,7 @@ class Dataset:
         initial_frequency_hz: float,
         srate_hz: float,
         delta_f_hz: Optional[float] = None,
-        waveform_generator: WaveformGenerator = BarePostNewtonianGenerator(),
+        waveform_generator: WaveformGenerator = BarePostNewtonianGenerator(), # TODO: Change it to `BarePostNewtonianModeGenerator()`
         parameter_generator_class: Type[ParameterGenerator] = UniformParameterGenerator,
         parameter_ranges: ParameterRanges = ParameterRanges(),
         parameter_generator: Optional[ParameterGenerator] = None,
