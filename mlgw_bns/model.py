@@ -136,23 +136,23 @@ class ParametersWithExtrinsic:
             dataset=dataset,
         )
 
-    # @classmethod
-    # def gw170817(cls) -> ParametersWithExtrinsic:
-    #     """Convenience method: an easy-to-access
-    #     set of parameters, roughly corresponding to the
-    #     best-fit values for GW170817.
-    #     """
+    @classmethod
+    def gw170817(cls) -> ParametersWithExtrinsic:
+        """Convenience method: an easy-to-access
+        set of parameters, roughly corresponding to the
+        best-fit values for GW170817.
+        """
         
-    #     return cls(
-    #         mass_ratio=1.,
-    #         lambda_1=400.,
-    #         lambda_2=400.,
-    #         chi_1=0.,
-    #         chi_2=0.,
-    #         distance_mpc=40.,
-    #         inclination=5/6*np.pi,
-    #         total_mass=2.8,
-    #     )
+        return cls(
+            mass_ratio=1.,
+            lambda_1=400.,
+            lambda_2=400.,
+            chi_1=0.,
+            chi_2=0.,
+            distance_mpc=40.,
+            inclination=5/6*np.pi,
+            total_mass=2.8,
+        )
 
     @property
     def mass_sum_seconds(self) -> float:
@@ -327,19 +327,6 @@ class Model:
             'extend_with_post_newtonian': self.extend_with_post_newtonian,
             'extend_with_zeros_at_high_frequency': self.extend_with_zeros_at_high_frequency,
         }
-
-    @classmethod
-    def default(cls, model_name: Optional[str]=None, **kwargs):
-        model = cls(DEFAULT_DATASET_BASENAME)
-
-        stream_arrays = pkg_resources.resource_stream(__name__, model.filename_arrays)
-        stream_nn = pkg_resources.resource_stream(__name__, model.filename_nn)
-
-        model.load(streams=(stream_arrays, stream_nn))
-
-        model.filename = filename
-
-        return model
 
     @classmethod
     def default_for_testing(cls, model_name: Optional[str]=None, **kwargs):
@@ -880,7 +867,7 @@ class Model:
         amp_ds = combine_residuals_amp(residuals.amplitude_residuals[0], pn_amplitude)
         phi_ds = combine_residuals_phi(residuals.phase_residuals[0], pn_phase)
 
-        pre = self.dataset.mlgw_bns_prefactor(intrinsic_params.eta, params.total_mass)
+        # pre = self.dataset.mlgw_bns_prefactor(intrinsic_params.eta, params.total_mass)
 
         resampled_amp = self.downsampling_training.resample(
                 self.dataset.frequencies_hz[
@@ -941,9 +928,10 @@ class Model:
 
         amp = (
             resampled_amp
-            * pre
-            / params.distance_mpc
-        )
+            )
+        #     * pre
+        #     / params.distance_mpc
+        # )
 
         phi = (
             resampled_phi
