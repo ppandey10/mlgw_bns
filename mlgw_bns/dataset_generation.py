@@ -1204,49 +1204,7 @@ class Dataset:
             phis.append(phi[phi_indices])
 
         return FDWaveforms(np.array(amps), np.array(phis))
-
-    def generate_teob_amp_phase(
-        self,
-        parameters: ParameterSet,
-        downsampling_indices: Optional[DownsamplingIndices] = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Returns Amplitude and Phase using TEOBResumS.
-
-        Parameters
-        ----------
-        parameters : ParameterSet
-            Parameters of the waveforms to generate
-        downsampling_indices : DownsamplingIndices, optional
-            Indices to downsample the waveforms at, by default None
-
-        Returns
-        -------
-         tuple[np.ndarray, np.ndarray]
-            Amplitude and phase.       
-        """
-
-        if downsampling_indices is None:
-            amp_indices: Union[slice, list[int]] = slice(None)
-            phi_indices: Union[slice, list[int]] = slice(None)
-        else:
-            amp_indices = downsampling_indices.amplitude_indices
-            phi_indices = downsampling_indices.phase_indices
-
-        waveform_param_list = parameters.waveform_parameters(self)
-
-        amps = []
-        phis = []
-
-        for par in tqdm(waveform_param_list, unit="waveforms"):
-            _, amp, phi = self.waveform_generator.effective_one_body_waveform(
-                par, self.frequencies
-            )
-            amps.append(amp[amp_indices])
-            phis.append(phi[phi_indices])
         
-        return amps, phis
-
-
 def expand_frequency_range(
     initial_frequency: float,
     final_frequency: float,

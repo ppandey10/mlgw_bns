@@ -34,10 +34,24 @@ print(mmodel.waveform_generator)
 #     # plt.plot(f, amp_mode_teob)
 # plt.show()
 
-p = ParametersWithExtrinsic(1, 400, 400, 0, 0, 40, 0, 2.8)
-p_teob = p.intrinsic(Dataset(20., 4096.))
-# plt.semilogy(f, model.predict_amplitude_phase(f, p)[1])
-# plt.loglog(f, mmodel.predict_amplitude_phase(f, p)[0])
-plt.loglog(f, model.waveform_generator.effective_one_body_waveform(p_teob, f)[2])
-# plt.semilogy(f, mmodel.predict_amplitude_phase(f, p)[1])
+
+d = Dataset(20., 4096.)
+f_natural = d.hz_to_natural_units(f)
+
+p = ParametersWithExtrinsic.gw170817()
+p_teob = p.intrinsic(d)
+
+# amp, phase = mmodel.predict_amplitude_phase(f, p)
+amp, phase = mmodel.predict_amplitude_phase(f, p)
+_, amp_teob, phase_teob = mmodel.waveform_generator.effective_one_body_waveform(p_teob, f_natural)
+# amp_teob, phase_teob = mmodel.generate_teob_amp_phase(p_teob, f_natural)
+
+# hp_m, hc_m = mmodel.predict(f, p)
+# plt.plot(f_natural, hp_m.real)
+# plt.show()
+
+# plt.loglog(f_natural, amp)
+# plt.loglog(f_natural, amp_teob)
+plt.semilogy(f_natural, phase)
+plt.semilogy(f_natural, phase_teob)
 plt.show()

@@ -867,7 +867,7 @@ class Model:
         amp_ds = combine_residuals_amp(residuals.amplitude_residuals[0], pn_amplitude)
         phi_ds = combine_residuals_phi(residuals.phase_residuals[0], pn_phase)
 
-        # pre = self.dataset.mlgw_bns_prefactor(intrinsic_params.eta, params.total_mass)
+        pre = self.dataset.mlgw_bns_prefactor(intrinsic_params.eta, params.total_mass)
 
         resampled_amp = self.downsampling_training.resample(
                 self.dataset.frequencies_hz[
@@ -928,7 +928,7 @@ class Model:
 
         amp = (
             resampled_amp
-            )
+        )
         #     * pre
         #     / params.distance_mpc
         # )
@@ -1015,6 +1015,49 @@ class Model:
         return compute_polarizations(
             cartesian_waveform_real, cartesian_waveform_imag, pre_plus, pre_cross
         )
+        
+    def generate_teob_amp_phase(
+        self,
+        params: "WaveformParameters", 
+        frequencies: Optional[np.ndarray] = None,
+        downsampling_indices: Optional[DownsamplingIndices] = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Returns Amplitude and Phase using TEOBResumS.
+
+        Parameters
+        ----------
+        parameters : ParameterSet
+            Parameters of the waveforms to generate
+        downsampling_indices : DownsamplingIndices, optional
+            Indices to downsample the waveforms at, by default None
+
+        Returns
+        -------
+         tuple[np.ndarray, np.ndarray]
+            Amplitude and phase.       
+        """
+
+        if downsampling_indices is None:
+            amp_indices: Union[slice, list[int]] = slice(None)
+            phi_indices: Union[slice, list[int]] = slice(None)
+        else:
+            amp_indices = self.downsampling_indices.amplitude_indices
+            phi_indices = self.downsampling_indices.phase_indices
+
+        amps = []
+        phis = []
+
+        _, amp, phi = self.dataset.waveform_generator.effective_one_body_waveform(
+            params, frequencies
+        )
+
+        amps.append(amp[amp_indices])
+        phis.append(phi[phi_indices])
+
+        amps_reshape = amps.flatten()
+        phi_reshape = phis.flatten()
+        
+        return amps_reshape, phi_reshape
 
     def time_until_merger(
         self,
@@ -1116,13 +1159,16 @@ class ModesModel:
             model.load(*args, **kwargs)
 
 
-    def predict(self, frequencies: np.ndarray, params: ParametersWithExtrinsic) -> tuple[np.ndarray, np.ndarray]:
+    def predict(
+        self, 
+        frequencies: np.ndarray, 
+        params: ParametersWithExtrinsic
+        ) -> tuple[np.ndarray, np.ndarray]:
         """Predict the plus- and cross-polarized frequency-domain waveform corresponding to 
         the given parameters, accounting for the effects of the included modes.
         
         References: https://arxiv.org/pdf/2004.06503.pdf (appendix E) for the modes decomposition.
         """
-        
 
         h_plus = np.zeros_like(frequencies, dtype=np.complex64)
         h_cross = np.zeros_like(frequencies, dtype=np.complex64)
@@ -1236,7 +1282,13 @@ def compute_polarizations(
     return hp, hc
  
 
-def h_plus_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination: float, reference_phase: float) -> np.ndarray:
+def h_plus_from_mode(
+    amp: np.ndarray, 
+    phi: np.ndarray, 
+    mode: Mode, 
+    inclination: float, 
+    reference_phase: float
+    ) -> np.ndarray:
     """Contribution to the plus polarization from a single mode 
     with both values of m: so, (l, m) as well as (l, -m) with m > 0.
     """
@@ -1244,13 +1296,13 @@ def h_plus_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination: 
     sin_phi = np.sin(phi)
     cos_phi = np.cos(phi)
     
-    Y_plus_re, Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase)
-    Y_minus_re, Y_minus_im  = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase)
+    # Y_plus_re, Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase)
+    # Y_minus_re, Y_minus_im  = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase)
 
-    # Y_plus_re = spherical_harmonic_plus.real
-    # Y_plus_im = spherical_harmonic_plus_m.imag
-    # Y_minus_re = spherical_harmonic_minus_m.real
-    # Y_minus_im = spherical_harmonic_minus_m.imag
+    Y_plus_re = spherical_harmonic_spin_2(mode, inclination, reference_phase).real
+    Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase).imag
+    Y_minus_re = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase).real
+    Y_minus_im = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase).imag
     
     ml = (-1)**mode.l
     
@@ -1264,7 +1316,7 @@ def h_plus_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination: 
         - sin_phi * (Y_plus_re + ml * Y_minus_re)
     )
     
-    return h_plus_re - 1j * h_plus_im
+    return h_plus_re + 1j * h_plus_im
 
 def h_cross_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination: float, reference_phase: float) -> np.ndarray:
     """Contribution to the cross polarization from a single mode 
@@ -1277,24 +1329,24 @@ def h_cross_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination:
     sin_phi = np.sin(phi)
     cos_phi = np.cos(phi)
     
-    Y_plus_re, Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase)
-    Y_minus_re, Y_minus_im = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase)
+    # Y_plus_re, Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase)
+    # Y_minus_re, Y_minus_im = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase)
 
-    # Y_plus_re = spherical_harmonic_plus_m.real
-    # Y_plus_im = spherical_harmonic_plus_m.imag
-    # Y_minus_re = spherical_harmonic_minus_m.real
-    # Y_minus_im = spherical_harmonic_minus_m.imag
+    Y_plus_re = spherical_harmonic_spin_2(mode, inclination, reference_phase).real
+    Y_plus_im = spherical_harmonic_spin_2(mode, inclination, reference_phase).imag
+    Y_minus_re = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase).real
+    Y_minus_im = spherical_harmonic_spin_2_conjugate(mode, inclination, reference_phase).imag
     
     ml = (-1)**mode.l
     
-    h_cross_re = - amp / 2 * (
-        + cos_phi * (Y_plus_re - ml * Y_minus_re)
-        + sin_phi * (Y_plus_im - ml * Y_minus_im)
+    h_cross_re = amp / 2 * (
+        - cos_phi * (Y_plus_re - ml * Y_minus_re)
+        - sin_phi * (Y_plus_im - ml * Y_minus_im)
     )
     
-    h_cross_im = - amp / 2 * (
-        + cos_phi * (Y_plus_im - ml * Y_minus_im)
-        - sin_phi * (Y_plus_re - ml * Y_minus_re)
+    h_cross_im = amp / 2 * (
+        - cos_phi * (Y_plus_im - ml * Y_minus_im)
+        + sin_phi * (Y_plus_re - ml * Y_minus_re)
     )
 
-    return h_cross_re - 1j * h_cross_im
+    return h_cross_re + 1j * h_cross_im

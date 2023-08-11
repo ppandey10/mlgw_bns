@@ -19,7 +19,6 @@ mmode = main_model.models[Mode(2, 2)]
 mmode.load()
 # mmode = mode_dict[Mode(l=2, m=2)]
 print(mmode.dataset.waveform_generator)
-print(mmode.nn)
 
 main_v_model = ValidateModel(mmode)
 main_mismatches = main_v_model.validation_mismatches(10)

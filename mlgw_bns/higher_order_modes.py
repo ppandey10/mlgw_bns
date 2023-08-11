@@ -179,7 +179,7 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
 
 def spherical_harmonic_spin_2(
     mode: Mode, inclination: float, azimuth: float
-) -> tuple[np.ndarray, np.ndarray]: # -> complex
+) -> complex:
     r"""Returns the spin-2 spherical harmonic
     :math:`^{-2}Y_{\ell m}(\iota, \varphi) =
     (-1)^s \sqrt{\frac{2 \ell+1}{4 \pi}} d_{m, s}^{\ell} (\iota) e^{im \phi_0}`
@@ -190,13 +190,12 @@ def spherical_harmonic_spin_2(
     d_lm = wigner_d_function_spin_2(mode, inclination)
     Y_lm = Y_lm_const * d_lms * np.exp(1j * mode.m * azimuth)
     
-    return (
-        Y_lm.real, Y_lm.imag
-        )
+    return Y_lm
+
 
 def spherical_harmonic_spin_2_conjugate( # TODO: change it's name
     mode: Mode, inclination: float, azimuth: float
-) -> tuple[np.ndarray, np.ndarray]: #-> complex
+) -> complex:
     r"""Returns the spin-2 spherical harmonic
     :math:`^{-2}Y_{\ell m}(\iota, \varphi) =
     (-1)^s \sqrt{\frac{2 \ell+1}{4 \pi}} d_{m, s}^{\ell} (\iota) e^{im \phi_0}`
@@ -208,13 +207,9 @@ def spherical_harmonic_spin_2_conjugate( # TODO: change it's name
     Y_lm_const = np.sqrt((2 * mode_opp.l + 1) / (4 * np.pi))
     d_star_lm = wigner_d_function_spin_2(mode_opp, inclination)
     Y_star_lm_minus = Y_lm_const * d_star_lm * np.exp(1j * mode_opp.m * azimuth)
-    Y_star_lm_minus_real = Y_star_lm_minus.real
-    Y_star_lm_minus_imag = Y_star_lm_minus.imag
 
-    return (
-      Y_star_lm_minus_real, Y_star_lm_minus_imag
-    )
-
+    return Y_star_lm_minus
+    
 
 def wigner_d_function_spin_2(mode: Mode, inclination: float) -> complex:
     """Equation II.8 in https://arxiv.org/pdf/0709.0093.pdf, with :math:`s=-2`."""
