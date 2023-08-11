@@ -172,9 +172,76 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
         phase = hflm[str(mode_to_k(self.mode))][1][to_slice]
         f_spa = f_spa[to_slice]
 
+        return (f_spa, amplitude, phase)
+        
+    def generate_full_teob_waveform(
+        self, 
+        params: "WaveformParameters",
+        frequencies: Optional[np.ndarray] = None,
+        downsampling_indices: Optional[DownsamplingIndices] = None,
+        ) -> tuple[np.ndarray, np.ndarray]:
+        """Returns plus and cross polarised waveforms
+        from a particular mode using TEOBResumS.
+
+        Parameters
+        ----------
+        parameters : ParameterSet
+            Parameters of the waveforms to generate
+        downsampling_indices : DownsamplingIndices, optional
+            Indices to downsample the waveforms at, by default None
+
+        Returns
+        -------
+         tuple[np.ndarray, np.ndarray]
+            Amplitude and phase.       
+        """
+        
+        assert self.mode is not None
+        mode_k = [mode_to_k(self.mode)]
+        par_dict: dict = params.teobresums()
+
+        n_additional = 256
+        f_0 = par_dict["initial_frequency"]
+        delta_f = par_dict["df"]
+        new_f0 = f_0 - delta_f * n_additional
+        par_dict["initial_frequency"] = new_f0
+
+        to_slice = (
+            slice(-len(frequencies), None)
+            if frequencies is not None
+            else slice(n_additional, None)
+        )
+
+        if frequencies is not None:
+            frequencies_list = list(
+                np.insert(
+                    frequencies,
+                    0,
+                    np.arange(f_0 - delta_f * n_additional, f_0, step=delta_f),
+                )
+            )
+            par_dict.pop("df")
+            par_dict["interp_freqs"] = "yes"
+            par_dict["freqs"] = frequencies_list
+
+        par_dict["arg_out"] = "yes"
+        par_dict["use_mode_lm"] = mode_k
+        
+        f_spa, hp_re, hp_im, hc_re, hc_im, hflm, _, _ = self.eobrun_callable(par_dict) 
+
+        hp, hc = hp_re - 1j*hp_im, hc_re - 1j*hc_im
+        # waveform = (hp - 1j*hc)[to_slice]
+
+        # hflm is the h_lm in freq. domain
+        # amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] # quite weird notation (`str`)
+        # phase = hflm[str(mode_to_k(self.mode))][1][to_slice]
+        # f_spa = f_spa[to_slice]
+
         # _, phase = phase_unwrapping(waveform)
 
-        return (f_spa, amplitude, phase)
+        return (
+            hp[to_slice], hc[to_slice]
+        )
 
 
 def spherical_harmonic_spin_2(

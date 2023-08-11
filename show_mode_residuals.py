@@ -47,11 +47,12 @@ _, amp_teob, phase_teob = mmodel.waveform_generator.effective_one_body_waveform(
 # amp_teob, phase_teob = mmodel.generate_teob_amp_phase(p_teob, f_natural)
 
 # hp_m, hc_m = mmodel.predict(f, p)
-# plt.plot(f_natural, hp_m.real)
+# hp_teob, hc_teob = mmodel.waveform_generator.generate_full_teob_waveform(p_teob, f_natural)
+# plt.plot(f, hp_teob.real - hp_m.real)
 # plt.show()
 
-# plt.loglog(f_natural, amp)
+plt.loglog(f_natural, amp)
 # plt.loglog(f_natural, amp_teob)
-plt.semilogy(f_natural, phase)
-plt.semilogy(f_natural, phase_teob)
+# plt.loglog(f, phase)
+# plt.loglog(f, phase_teob)
 plt.show()

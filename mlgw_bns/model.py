@@ -48,6 +48,7 @@ from .principal_component_analysis import (
     PrincipalComponentTraining,
 )
 from .taylorf2 import SUN_MASS_SECONDS, smoothing_func
+from .higher_order_modes import mode_to_k
 # from .taylorF2_HOM import *
 
 PRETRAINED_MODEL_FOLDER = "data/"
