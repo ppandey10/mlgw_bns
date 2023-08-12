@@ -126,7 +126,7 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
         self, params: "WaveformParameters", frequencies: Optional[np.ndarray] = None
     )-> tuple[np.ndarray, np.ndarray, np.ndarray]:
         assert self.mode is not None
-        mode_k = [mode_to_k(self.mode)]
+
         par_dict: dict = params.teobresums()
 
         # tweak initial frequency backward by a few samples
@@ -160,7 +160,7 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
             par_dict["freqs"] = frequencies_list
 
         par_dict["arg_out"] = "yes"
-        par_dict["use_mode_lm"] = mode_k
+        par_dict["use_mode_lm"] = [mode_to_k(self.mode)]
         
         f_spa, hp_re, hp_im, hc_re, hc_im, hflm, _, _ = self.eobrun_callable(par_dict) 
 
@@ -168,8 +168,9 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
         # waveform = (hp - 1j*hc)[to_slice]
 
         # hflm is the h_lm in freq. domain
-        amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] # quite weird notation (`str`)
+        amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] * params.eta # quite weird notation (`str`)
         phase = hflm[str(mode_to_k(self.mode))][1][to_slice]
+        # phase = np.unwrap(np.angle(hflm))[to_slice]
         f_spa = f_spa[to_slice]
 
         return (f_spa, amplitude, phase)

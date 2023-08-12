@@ -293,22 +293,14 @@ class TEOBResumSGenerator(BarePostNewtonianGenerator):
             par_dict["interp_freqs"] = "yes"
             par_dict["freqs"] = frequencies_list
 
-        # par_dict["arg_out"] = "yes"
-        # par_dict["use_mode_lm"] = [1]
-
         f_spa, rhpf, ihpf, _, _ = self.eobrun_callable(par_dict)
-        # f_spa, _, _, _, _, hflm, _, _ = self.eobrun_callable(par_dict)
 
         f_spa = f_spa[to_slice]
-        # f_spa = f_spa
 
         waveform = (rhpf - 1j * ihpf)[to_slice]
-        # waveform = rhpf - 1j * ihpf
 
         amplitude, phase = phase_unwrapping(waveform)
-        # amplitude = hflm['1'][0][to_slice] # quite weird notation (`str`)
-        # phase = hflm['1'][1][to_slice]
-
+        
         return (f_spa, amplitude, phase)
 
 

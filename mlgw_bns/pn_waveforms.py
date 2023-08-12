@@ -69,10 +69,15 @@ def H_22(
     v4 = v2 * v2
     v6 = v3 * v3
 
-    v2_coefficient = 451 * eta / 168 - 323 / 224
+    v2_coefficient = (
+        451 * eta / 168 
+        - 323 / 224
+    )
 
     v3_coefficient = (
-        27 * delta * chi_a_z / 8 - 11 * eta * chi_s_z / 6 + 27 * chi_s_z / 8
+        27 * delta * chi_a_z / 8 
+        - 11 * eta * chi_s_z / 6 
+        + 27 * chi_s_z / 8
     )
 
     v4_coefficient = (
@@ -171,8 +176,9 @@ def amp_lm(H_lm_callable: H_callable, mode: Mode):
 
 def phi_lm(mode: Mode):
     def function(params: "WaveformParameters", frequencies: np.ndarray) -> np.ndarray:
+        f_m = 2 * frequencies / mode.m 
         return (
-            phase_5h_post_newtonian_tidal(params, frequencies) * (mode.m / 2)
+            phase_5h_post_newtonian_tidal(params, f_m) * (mode.m / 2) 
         )
     
     return function
