@@ -314,3 +314,49 @@ class ValidateModel:
             raise ValueError("Mismatch optimization did not succeed!")
 
         return 1 - (-res.fun) / norm
+
+    def teob_and_pred_wavforms(
+        self,
+        number_of_waveforms: int,
+        seed: Optional[int] = None,
+        true_waveforms: Optional[FDWaveforms] = None,
+        zero_residuals: bool = False, 
+    ) -> tuple[np.ndarray, np.ndarray]:
+
+        param_set = self.param_set(number_of_waveforms, seed)
+
+        if true_waveforms is None:
+            true_waveforms = self.true_waveforms(param_set)
+
+        if zero_residuals:
+            predicted_waveforms = self.post_newtonian_waveforms(param_set)
+        else:
+            predicted_waveforms = self.predicted_waveforms(param_set)
+
+        return self.cartesian_waveforms_array(true_waveforms, predicted_waveforms)
+
+    def cartesian_waveforms_array(
+        self, waveform_array_1: FDWaveforms, waveform_array_2: FDWaveforms
+    ) -> tuple[np.ndarray, np.ndarray]:
+
+        assert self.model.downsampling_indices is not None
+
+        cartesian_1 = cartesian_waveforms_at_frequencies(
+            waveform_array_1,
+            self.model.dataset.hz_to_natural_units(self.frequencies),
+            self.model.dataset,
+            self.model.downsampling_training,
+            self.model.downsampling_indices,
+        )
+
+        cartesian_2 = cartesian_waveforms_at_frequencies(
+            waveform_array_2,
+            self.model.dataset.hz_to_natural_units(self.frequencies),
+            self.model.dataset,
+            self.model.downsampling_training,
+            self.model.downsampling_indices,
+        )
+
+        return (
+            cartesian_1, cartesian_2
+        )

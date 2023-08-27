@@ -13,6 +13,7 @@ def modes_main():
     plt.plot(loss_over_epochs)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
+    plt.savefig('loss_over_epochs.pdf', dpi = 800)
     plt.show()
 
     # import os; os.replace...

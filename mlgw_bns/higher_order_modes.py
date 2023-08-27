@@ -167,10 +167,9 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
         # hp, hc = hp_re-1j*hp_im, hc_re-1j*hc_im
         # waveform = (hp - 1j*hc)[to_slice]
 
-        # hflm is the h_lm in freq. domain
         amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] * params.eta # quite weird notation (`str`)
-        phase = hflm[str(mode_to_k(self.mode))][1][to_slice]
-        # phase = np.unwrap(np.angle(hflm))[to_slice]
+        phase = - hflm[str(mode_to_k(self.mode))][1][to_slice]
+
         f_spa = f_spa[to_slice]
 
         return (f_spa, amplitude, phase)
@@ -232,11 +231,6 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
 
         hp, hc = hp_re - 1j*hp_im, hc_re - 1j*hc_im
         # waveform = (hp - 1j*hc)[to_slice]
-
-        # hflm is the h_lm in freq. domain
-        # amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] # quite weird notation (`str`)
-        # phase = hflm[str(mode_to_k(self.mode))][1][to_slice]
-        # f_spa = f_spa[to_slice]
 
         # _, phase = phase_unwrapping(waveform)
 

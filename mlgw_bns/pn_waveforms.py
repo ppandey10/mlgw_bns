@@ -176,9 +176,8 @@ def amp_lm(H_lm_callable: H_callable, mode: Mode):
 
 def phi_lm(mode: Mode):
     def function(params: "WaveformParameters", frequencies: np.ndarray) -> np.ndarray:
-        f_m = 2 * frequencies / mode.m 
         return (
-            phase_5h_post_newtonian_tidal(params, f_m) * (mode.m / 2) 
+            phase_5h_post_newtonian_tidal(params, frequencies) * (mode.m / 2) 
         )
     
     return function
