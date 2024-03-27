@@ -168,17 +168,19 @@ class Hyperparameters:
         #     pass
         assert training_waveform_number is not None
 
+        # Modified the hyperparameters for (3,3) mode
+
         return cls(
-            hidden_layer_sizes=(106, 23), # (150, 200),
+            hidden_layer_sizes=(169, 71), # (150, 200),
             activation="relu",
-            alpha=0.017351174254327164, # 1e-4
-            batch_size=196, # previously 50
-            learning_rate_init=0.00027700728622553824,
-            tol=7.230581728895463e-12,
-            n_iter_no_change=51,
-            validation_fraction=0.07671981357346613,
-            pc_exponent=0.006594127410992486,
-            n_train=152,
+            alpha=0.0008918136131265236, # 1e-4
+            batch_size=160, # previously 50
+            learning_rate_init=0.0002353780383291372,
+            tol=4.6659267067767714e-14,
+            n_iter_no_change=74,
+            validation_fraction=0.07405053167928363,
+            pc_exponent=0.01948145530324084,
+            n_train=861,
         )
 
 
