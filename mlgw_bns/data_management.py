@@ -171,7 +171,7 @@ class ParameterRanges(SavableData):
     """
 
     mass_range: Tuple[float, float] = (2.0, 4.0)
-    q_range: Tuple[float, float] = (1.0, 3.0)
+    q_range: Tuple[float, float] = (1.2, 3.0)
     lambda1_range: Tuple[float, float] = (5.0, 5000.0)
     lambda2_range: Tuple[float, float] = (5.0, 5000.0)
     chi1_range: Tuple[float, float] = (-0.5, 0.5)
