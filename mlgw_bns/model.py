@@ -42,7 +42,7 @@ from .higher_order_modes import (
     teob_mode_generator_factory,
 )
 from .downsampling_interpolation import DownsamplingTraining, GreedyDownsamplingTraining
-from .neural_network import Hyperparameters, NeuralNetwork, SklearnNetwork
+from .neural_network import Hyperparameters, NeuralNetwork, SklearnNetwork, TimeshiftsGPR
 from .principal_component_analysis import (
     PrincipalComponentAnalysisModel,
     PrincipalComponentTraining,
@@ -58,6 +58,10 @@ PRETRAINED_MODES_MODEL_FOLDER = "data/HOM/"
 MODES_MODELS_AVAILABLE = ["pp_small_default_l2_m2", "pp_large_default_l2_m2"] 
 
 DEFAULT_DATASET_BASENAME = "data/default"
+
+time_shifts_predictor = TimeshiftsGPR().load_model(
+    filename="/home/ge73qip/playground/mlgw_bns/sandbox/trials_timeshifts.pkl"
+)
 
 class FrequencyTooLowError(ValueError):
     """Raised when the frequency given to the predictor is too low."""
@@ -240,7 +244,7 @@ class Model:
     def __init__(
         self,
         filename: Optional[str] = None,
-        initial_frequency_hz: float = 10.0, # it was 20 in jacopo's hom implementation
+        initial_frequency_hz: float = 20.0,
         srate_hz: float = 4096.0,
         pca_components_number: int = 30,
         multibanding: bool = True,
@@ -275,7 +279,6 @@ class Model:
         self.parameter_generator = parameter_generator
         self.extend_with_post_newtonian = extend_with_post_newtonian
         self.extend_with_zeros_at_high_frequency = extend_with_zeros_at_high_frequency 
-        # The last two snippets were not included in the Jacopo implementation
 
         self.dataset = self._make_dataset()
 
@@ -384,7 +387,7 @@ class Model:
             waveform_generator=self.waveform_generator,
             multibanding=self.multibanding,
             parameter_ranges=self.parameter_ranges,
-            parameter_generator=self.parameter_generator
+            parameter_generator=self.parameter_generator,
         )
     
     @property
@@ -539,8 +542,14 @@ class Model:
             assert self.pca_data is not None
 
         if training_nn_dataset_size is not None:
-            _, parameters, residuals = self.dataset.generate_residuals(
-                training_nn_dataset_size, self.downsampling_indices
+            freq_downsampled, parameters, residuals = self.dataset.generate_residuals(
+                training_nn_dataset_size, self.downsampling_indices, flatten_phase=False
+            )
+
+            residuals.phase_residuals = remove_linear_trend(
+                parameters=parameters,
+                phi_diff=residuals.phase_residuals,
+                frq=self.dataset.natural_units_to_hz(freq_downsampled)
             )
 
             self.training_dataset = residuals
@@ -1351,3 +1360,13 @@ def h_cross_from_mode(amp: np.ndarray, phi: np.ndarray, mode: Mode, inclination:
     )
 
     return h_cross_re + 1j * h_cross_im
+
+def remove_linear_trend(parameters, phi_diff, frq):
+    for i in range(parameters.parameter_array.shape[0]):
+        phi_diff[i] = (
+            phi_diff[i] 
+            - 2 * np.pi * (frq - frq[0]) * time_shifts_predictor.predict([parameters.parameter_array[i]]) 
+            - phi_diff[i,0]
+        )
+
+    return phi_diff
