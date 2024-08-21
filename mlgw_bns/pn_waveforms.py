@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Callable, NamedTuple
 import numpy as np
 from numba import njit 
 
-from .taylorf2 import phase_5h_post_newtonian_tidal, smoothly_connect_with_zero
+from .taylorf2 import phase_5h_post_newtonian_tidal, smoothly_connect_with_zero, SUN_MASS_SECONDS
 
 from .dataset_generation import (
     WaveformGenerator,
@@ -354,6 +354,8 @@ def H_33(
     v2 = v * v
     v3 = v2 * v
     v4 = v2 * v2
+    v5 = v2 * v3
+    v6 = v3 * v3
 
     H33_coefficient = -3/4 * i * np.sqrt(5/7)
 
@@ -370,8 +372,41 @@ def H_33(
         - 28 * eta * chi_a_z / 3 
         + 65 * chi_a_z / 24
         )
+    
+    v5_coefficient = (
+        420389 * delta * eta ** 2 / 63360
+        + 10 * delta * eta * chi_a_z ** 2
+        + delta * eta * chi_s_z ** 2 / 8
+        - 11758073 * delta * eta / 887040
+        - 81 * eta * chi_a_z ** 2 / 32
+        - 81 * eta * chi_s_z ** 2 / 32
+        - 1077664867 * delta / 447068160
+        + 81 * eta * chi_a_z * chi_s_z / 4
+        - 81 * chi_a_z * chi_s_z / 16
+    )
 
-    h33 = (v1_coefficient * v1  + v3_coefficient * v3 + v4_coefficient * v4)
+    v6_coefficient = (
+        - 67 * delta * eta ** 2 * chi_s_z / 72
+        - 58745 * delta * eta * chi_s_z / 4032
+        + 131 * np.pi * delta * eta / 16
+        - 440957 * i * delta * eta / 9720
+        + 69 * i * delta * eta * np.log(3 / 2) / 4
+        + 163021 * delta * chi_s_z / 16128
+        - 5675 * np.pi * delta / 1344
+        + 389 * i * delta / 32
+        - 1945 * i * delta * np.log(3/2) / 112
+        - 137 * eta ** 2 * chi_a_z / 24
+        - 148501 * eta * chi_a_z / 4032
+        + 163021 * chi_a_z / 16128
+    )
+
+    h33 = (
+        v1_coefficient * v1  
+        + v3_coefficient * v3 
+        + v4_coefficient * v4 
+        + v5_coefficient * v5 
+        + v6_coefficient * v6
+        )
 
     return (H33_coefficient * h33)
 
@@ -500,7 +535,6 @@ def amp_lm(H_lm_callable: H_callable, mode: Mode):
     def function(params: "WaveformParameters", frequencies: np.ndarray) -> np.ndarray:
 
         v = np.abs(2 * np.pi * frequencies / mode.m) ** (1.0 / 3.0)
-
         delta = (params.mass_ratio - 1) / (params.mass_ratio + 1)
         chi_a_z = (params.chi_1 - params.chi_2) / 2
         chi_s_z = (params.chi_1 + params.chi_2) / 2
