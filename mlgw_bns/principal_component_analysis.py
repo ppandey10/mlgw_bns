@@ -12,6 +12,11 @@ import numpy as np
 
 from .data_management import DownsamplingIndices, PrincipalComponentData
 from .dataset_generation import Dataset
+from .neural_network import TimeshiftsGPR
+
+time_shifts_predictor = TimeshiftsGPR().load_model(
+    filename="/home/ge73qip/playground/mlgw_bns/sandbox/trials_timeshifts.pkl"
+)
 
 
 class PrincipalComponentTraining:
@@ -52,9 +57,16 @@ class PrincipalComponentTraining:
             "Generating %s waveforms for PCA training", number_of_training_waveforms
         )
 
-        _, _, residuals = self.dataset.generate_residuals(
+        freq_downsampled, parameters, residuals = self.dataset.generate_residuals(
             number_of_training_waveforms,
             self.downsampling_indices,
+            flatten_phase=False
+        )
+
+        residuals.phase_residuals = remove_linear_trend(
+            parameters=parameters,
+            phi_diff=residuals.phase_residuals,
+            frq=self.dataset.natural_units_to_hz(freq_downsampled)
         )
 
         logging.info("Fitting PCA model")
@@ -166,3 +178,14 @@ class PrincipalComponentAnalysisModel:
         zero_mean_data = scaled_data @ pca_data.eigenvectors.T
 
         return zero_mean_data + pca_data.mean
+    
+def remove_linear_trend(parameters, phi_diff, frq):
+    
+    for i in range(parameters.parameter_array.shape[0]):
+        phi_diff[i] = (
+            phi_diff[i] 
+            - 2 * np.pi * (frq - frq[0]) * time_shifts_predictor.predict([parameters.parameter_array[i]]) 
+            - phi_diff[i,0]
+        )
+
+    return phi_diff

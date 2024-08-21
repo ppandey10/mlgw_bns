@@ -15,7 +15,8 @@ def Y_2_pos_2(
     phi_c: float # phase at merger
 ):
     return (
-        1/2 * np.sqrt(5/np.pi) * np.cos(inclination/2) ** 4 * np.exp(2*1j*phi_c)
+        np.cos(inclination / 2) ** 4 
+        * np.exp(2 * 1j * phi_c)
     )
 
 def Y_2_neg_2(
@@ -23,7 +24,8 @@ def Y_2_neg_2(
     phi_c: float 
 ):
     return (
-        1/2 * np.sqrt(5/np.pi) * np.sin(inclination/2) ** 4 * np.exp(-2*1j*phi_c)
+        np.sin(inclination / 2) ** 4 
+        * np.exp(-2 * 1j * phi_c)
     )
 
 def Y_2_pos_1(
@@ -31,7 +33,11 @@ def Y_2_pos_1(
     phi_c: float 
 ):
     return (
-        1/2 * np.sqrt(5/np.pi) * (np.cos(inclination/2) ** 2) * np.sin(inclination) * np.exp(1j*phi_c)
+        1/2 
+        * np.sqrt(5 / np.pi) 
+        * np.cos(inclination / 2) ** 2 
+        * np.sin(inclination) 
+        * np.exp(1j * phi_c)
     )
 
 def Y_2_neg_1(
@@ -39,7 +45,11 @@ def Y_2_neg_1(
     phi_c: float 
 ):
     return (
-        1/2 * np.sqrt(5/np.pi) * (np.sin(inclination/2) ** 2) * np.sin(inclination) * np.exp(-1j*phi_c)
+        1/2 
+        * np.sqrt(5 / np.pi) 
+        * np.sin(inclination / 2) ** 2 
+        * np.sin(inclination) 
+        * np.exp(-1j * phi_c)
     )
 
 def Y_3_pos_3(
@@ -47,7 +57,11 @@ def Y_3_pos_3(
     phi_c: float 
 ):
     return (
-        1/2 * np.sqrt(21/2*np.pi) * (np.cos(inclination/2) ** 4) * np.sin(inclination) * (-np.exp(3j*phi_c))
+        1 / 2
+        * np.sqrt(21 / (2 * np.pi))
+        * np.cos(inclination / 2) ** 4 
+        * np.sin(inclination) 
+        * (-np.exp(3j * phi_c))
     )
 
 def Y_3_neg_3(
@@ -55,7 +69,11 @@ def Y_3_neg_3(
     phi_c: float 
 ):
     return (
-        1/2 * np.sqrt(21/2*np.pi) * (np.sin(inclination/2) ** 4) * np.sin(inclination) * np.exp(-3j*phi_c)
+        1 / 2
+        * np.sqrt(21 / (2 * np.pi))
+        * np.sin(inclination / 2) ** 4 
+        * np.sin(inclination) 
+        * np.exp(-3j * phi_c)
     )
 
 def Y_4_pos_4(
@@ -63,7 +81,11 @@ def Y_4_pos_4(
     phi_c: float 
 ):
     return (
-        3/4 * np.sqrt(7/np.pi) * (np.cos(inclination/2) ** 4) * (np.sin(inclination) ** 2) * np.exp(4j*phi_c)
+        3 / 4 
+        * np.sqrt(7 / np.pi) 
+        * np.cos(inclination / 2) ** 4 
+        * np.sin(inclination) ** 2 
+        * np.exp(4j * phi_c)
     )
 
 def Y_4_neg_4(
@@ -71,7 +93,11 @@ def Y_4_neg_4(
     phi_c: float 
 ):
     return (
-        3/4 * np.sqrt(7/np.pi) * (np.sin(inclination/2) ** 4) * (np.sin(inclination) ** 2) * np.exp(-4j*phi_c)
+        3 / 4 
+        * np.sqrt(7 / np.pi) 
+        * np.sin(inclination / 2) ** 4 
+        * np.sin(inclination) ** 2 
+        * np.exp(-4j * phi_c)
     )
 
 
