@@ -56,7 +56,9 @@ class WaveformGenerator(ABC):
     """
 
     def __init__(self):
-        self.frequencies: Optional[np.ndarray] = None
+        # self.frequencies: Optional[np.ndarray] = None
+        self.frequencies: Optional[np.ndarray] = np.arange(20, 2048, 0.0007153125) * 1.3791374655266094e-05
+        # self.frequencies: Optional[np.ndarray] = np.arange(20, 2048, 0.001153125) * 1.3791374655266094e-05
 
     @abstractmethod
     def post_newtonian_amplitude(
@@ -149,6 +151,14 @@ class WaveformGenerator(ABC):
                 (so, not constrained between 0 and 2pi).
         """
 
+    @abstractmethod
+    def full_effective_one_body_waveform(
+        self, params: "WaveformParameters", frequencies: Optional[np.ndarray] = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        r"""
+        Full EOB. TODO: update!
+        """
+
     def generate_residuals(
         self,
         params: "WaveformParameters",
@@ -188,6 +198,10 @@ class WaveformGenerator(ABC):
             params, frequencies
         )
 
+        amplitude_pn_ = self.post_newtonian_amplitude(params, frequencies_eob)
+        phase_pn_ = self.post_newtonian_phase(params, frequencies_eob)
+        # _, phase_pn_ = phase_unwrapping(amplitude_pn_ * np.exp(1j * phase_pn_))
+
         if downsampling_indices:
             amp_indices, phi_indices = downsampling_indices
             amp_frequencies = frequencies_eob[amp_indices]
@@ -199,13 +213,13 @@ class WaveformGenerator(ABC):
             amp_frequencies = frequencies_eob
             phi_frequencies = frequencies_eob
 
-        amplitude_pn = self.post_newtonian_amplitude(params, amp_frequencies)
-        phase_pn = self.post_newtonian_phase(params, phi_frequencies)
+        amplitude_pn = amplitude_pn_[amp_indices]
+        phase_pn = phase_pn_[phi_indices]
+        
+        # assert np.all(amplitude_pn > 0)
+        # assert np.all(amplitude_eob > 0)
 
-        assert np.all(amplitude_pn > 0)
-        assert np.all(amplitude_eob > 0)
-
-        return (np.log(amplitude_eob / amplitude_pn), phase_eob - phase_pn)
+        return (np.log(np.abs(amplitude_eob) / np.abs(amplitude_pn)), phase_eob - phase_pn)
 
 
 class BarePostNewtonianGenerator(WaveformGenerator):
@@ -231,6 +245,14 @@ class BarePostNewtonianGenerator(WaveformGenerator):
         return phase_5h_post_newtonian_tidal(params, frequencies)
 
     def effective_one_body_waveform(
+        self, params: "WaveformParameters", frequencies: Optional[np.ndarray] = None
+    ):
+        raise NotImplementedError(
+            "This generator does not include the possibility "
+            "to generate effective one body waveforms"
+        )
+    
+    def full_effective_one_body_waveform(
         self, params: "WaveformParameters", frequencies: Optional[np.ndarray] = None
     ):
         raise NotImplementedError(
@@ -443,7 +465,7 @@ class WaveformParameters:
             "use_geometric_units": "yes",
             "interp_uniform_grid": "no",
             "domain": 1,  # Fourier domain
-            "srate_interp": srate,
+            "srate_interp": srate, # final f
             "df": self.dataset.delta_f_hz * self.dataset.mass_sum_seconds,
             "inclination": 0.0,
             "output_hpc": "no",
@@ -1060,12 +1082,12 @@ class Dataset:
             amp_length = downsampling_indices.amp_length
             phi_length = downsampling_indices.phi_length
 
-        amp_residuals = np.empty((size, amp_length))
-        phi_residuals = np.empty((size, phi_length))
-        parameter_array = np.empty((size, WaveformParameters.number_of_parameters))
+        amp_residuals = np.empty((size, amp_length), dtype=np.float32)
+        phi_residuals = np.empty((size, phi_length), dtype=np.float32)
+        parameter_array = np.empty((size, WaveformParameters.number_of_parameters), dtype=np.float32)
 
         if self.parameter_generator is None:
-            parameter_generator = self.make_parameter_generator()
+            parameter_generator = self.make_parameter_generator(seed=2)
         else:
             parameter_generator = self.parameter_generator
 
@@ -1083,16 +1105,16 @@ class Dataset:
 
         residuals = Residuals(amp_residuals, phi_residuals)
 
-        if flatten_phase:
-            if downsampling_indices is None:
-                indices: Union[slice, list[int]] = slice(None)
-            else:
-                indices = downsampling_indices.phase_indices
+        if downsampling_indices is None:
+            indices: Union[slice, list[int]] = slice(None)
+        else:
+            indices = downsampling_indices.phase_indices
 
+        if flatten_phase:
             residuals.flatten_phase(self.frequencies[indices])
 
         return (
-            self.frequencies,
+            self.frequencies[indices],
             self.parameter_set_cls(parameter_array),
             residuals,
         )
@@ -1235,6 +1257,11 @@ def expand_frequency_range(
 
     m_min, m_max = mass_range
     assert m_min <= m_max
+
+    # return (
+    #     initial_frequency,
+    #     final_frequency,
+    # )
 
     return (
         initial_frequency * (m_min / reference_mass),
