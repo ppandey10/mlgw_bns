@@ -122,6 +122,60 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
         super().__init__(*args, **kwargs)
         self.eobrun_callable = eobrun_callable
 
+    def full_effective_one_body_waveform(
+        self, params: "WaveformParameters", frequencies: Optional[np.ndarray] = None
+    )-> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        assert self.mode is not None
+
+        par_dict: dict = params.teobresums()
+
+        n_additional = 5000
+        f_0 = par_dict["initial_frequency"]
+        delta_f = par_dict["df"]
+        new_f0 = f_0 - delta_f * n_additional
+        par_dict["initial_frequency"] = new_f0
+
+        to_slice = (
+            slice(-len(frequencies), None)
+            if frequencies is not None
+            else slice(n_additional, None)
+        )
+
+        if frequencies is not None:
+            frequencies_list = list(
+                np.insert(
+                    frequencies,
+                    0,
+                    np.arange(f_0 - delta_f * n_additional, f_0, step=delta_f),
+                )
+            )
+            par_dict.pop("df")
+            par_dict["interp_freqs"] = "yes"
+            par_dict["freqs"] = frequencies_list
+
+        par_dict["arg_out"] = "yes"
+        par_dict["use_mode_lm"] = [1, 4]
+        par_dict["inclination"] = np.pi / 3
+
+        # print(without_keys(par_dict, {"freqs"}))
+        f_spa, hp_re, hp_im, hc_re, hc_im, hflm, htlm, _ = self.eobrun_callable(par_dict)
+
+        # print(without_keys(par_dict, {"freqs"}))
+        # amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] * params.eta 
+        # phase = - hflm[str(mode_to_k(self.mode))][1][to_slice]
+
+        hp = (hp_re - 1j * hp_im)[to_slice]
+        hc = (hc_re - 1j * hc_im)[to_slice]
+        h = (hp - 1j * hc)
+
+        # amp_full = np.abs(h)
+        # phase_full = np.unwrap(np.angle(h))
+        amp_full, phase_full = phase_unwrapping(h)
+
+        f_spa = f_spa[to_slice]
+        
+        return (f_spa, amp_full, phase_full)
+        
     def effective_one_body_waveform(
         self, params: "WaveformParameters", frequencies: Optional[np.ndarray] = None
     )-> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -129,13 +183,7 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
 
         par_dict: dict = params.teobresums()
 
-        # tweak initial frequency backward by a few samples
-        # this is needed because of a bug in TEOBResumS
-        # causing the phase evolution not to behave properly
-        # at the beginning of integration
-        # TODO remove this once the TEOB bug is fixed
-
-        n_additional = 256
+        n_additional = 5000
         f_0 = par_dict["initial_frequency"]
         delta_f = par_dict["df"]
         new_f0 = f_0 - delta_f * n_additional
@@ -161,83 +209,24 @@ class TEOBResumSModeGenerator(BarePostNewtonianModeGenerator):
 
         par_dict["arg_out"] = "yes"
         par_dict["use_mode_lm"] = [mode_to_k(self.mode)]
+
+        if self.mode == Mode(3,3) or self.mode == Mode(2,1) or self.mode == Mode(4,4):
+            par_dict["inclination"] = np.pi / 2
+
+        # print(without_keys(par_dict, {"freqs"}))
         
-        f_spa, hp_re, hp_im, hc_re, hc_im, hflm, _, _ = self.eobrun_callable(par_dict) 
+        f_spa, hp_re, hp_im, hc_re, hc_im, hflm, htlm, _ = self.eobrun_callable(par_dict) 
+        
+        hp = (hp_re - 1j * hp_im)[to_slice]
+        # hc = (hc_re - 1j * hc_im)[to_slice]
+        # h = hp - 1j * hc
 
-        # hp, hc = hp_re-1j*hp_im, hc_re-1j*hc_im
-        # waveform = (hp - 1j*hc)[to_slice]
-
-        amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] * params.eta # quite weird notation (`str`)
-        phase = - hflm[str(mode_to_k(self.mode))][1][to_slice]
+        _, phase = phase_unwrapping(hp)
+        amplitude = hflm[str(mode_to_k(self.mode))][0][to_slice] * params.eta 
 
         f_spa = f_spa[to_slice]
 
         return (f_spa, amplitude, phase)
-        
-    def generate_full_teob_waveform(
-        self, 
-        params: "WaveformParameters",
-        frequencies: Optional[np.ndarray] = None,
-        downsampling_indices: Optional[DownsamplingIndices] = None,
-        ) -> tuple[np.ndarray, np.ndarray]:
-        """Returns plus and cross polarised waveforms
-        from a particular mode using TEOBResumS.
-
-        Parameters
-        ----------
-        parameters : ParameterSet
-            Parameters of the waveforms to generate
-        downsampling_indices : DownsamplingIndices, optional
-            Indices to downsample the waveforms at, by default None
-
-        Returns
-        -------
-         tuple[np.ndarray, np.ndarray]
-            Amplitude and phase.       
-        """
-        
-        assert self.mode is not None
-        mode_k = [mode_to_k(self.mode)]
-        par_dict: dict = params.teobresums()
-
-        n_additional = 256
-        f_0 = par_dict["initial_frequency"]
-        delta_f = par_dict["df"]
-        new_f0 = f_0 - delta_f * n_additional
-        par_dict["initial_frequency"] = new_f0
-
-        to_slice = (
-            slice(-len(frequencies), None)
-            if frequencies is not None
-            else slice(n_additional, None)
-        )
-
-        if frequencies is not None:
-            frequencies_list = list(
-                np.insert(
-                    frequencies,
-                    0,
-                    np.arange(f_0 - delta_f * n_additional, f_0, step=delta_f),
-                )
-            )
-            par_dict.pop("df")
-            par_dict["interp_freqs"] = "yes"
-            par_dict["freqs"] = frequencies_list
-
-        par_dict["arg_out"] = "yes"
-        par_dict["use_mode_lm"] = mode_k
-        
-        f_spa, hp_re, hp_im, hc_re, hc_im, hflm, _, _ = self.eobrun_callable(par_dict) 
-
-        hp, hc = hp_re - 1j*hp_im, hc_re - 1j*hc_im
-        # waveform = (hp - 1j*hc)[to_slice]
-
-        # _, phase = phase_unwrapping(waveform)
-
-        return (
-            hp[to_slice], hc[to_slice]
-        )
-
 
 def spherical_harmonic_spin_2(
     mode: Mode, inclination: float, azimuth: float
@@ -250,7 +239,7 @@ def spherical_harmonic_spin_2(
     """
     Y_lm_const = np.sqrt((2 * mode.l + 1) / (4 * np.pi))
     d_lm = wigner_d_function_spin_2(mode, inclination)
-    Y_lm = Y_lm_const * d_lms * np.exp(1j * mode.m * azimuth)
+    Y_lm = Y_lm_const * d_lm * np.exp(1j * mode.m * azimuth)
     
     return Y_lm
 
@@ -328,3 +317,6 @@ def teob_mode_generator_factory(mode: Mode) -> ModeGenerator:
     except ModuleNotFoundError as e:
 
         return BarePostNewtonianModeGenerator(mode=mode)
+
+def without_keys(d, keys):
+    return {x: d[x] for x in d if x not in keys}
